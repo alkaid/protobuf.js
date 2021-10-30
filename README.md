@@ -10,13 +10,15 @@
 ## 内容
 
 * 安装<br />
-  `npm i --save github:alkaid/protobufjs#v6.11.2-wechat.1`
+  `npm i --save github:alkaid/protobuf.js#wechat` //分支最新<br/>
+  或者<br/>
+  `npm i --save github:alkaid/protobuf.js#v6.11.2-wechat.1` //指定release tag
 
 * 使用<br />
   目前支持 [JSON descriptors](https://github.com/maxim-top/protobuf.js#using-json-descriptors) 模式
   ，使用前先用 `pbjs -t json `将 .proto 转为 .json<br/>
-  导入:<br/>
-  `import protobuf from 'protobufjs/light';`
+  ts中导入:<br/>
+  `import protobuf from 'protobufjs/light.js';`
 
 * 已知问题<br />
   * cli 工具集的 source 和 bin 不同步,但请放心使用 cli 工具，因为bin是官方版本,并没有用改动后的source重编译.具体原因如下:
