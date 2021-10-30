@@ -1,7 +1,7 @@
 "use strict";
 module.exports = proto3_target;
 
-var protobuf = require("../..");
+var protobuf = require("../index_protobufjs_origin");
 
 proto3_target.description = "Protocol Buffers, Version 3";
 
