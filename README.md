@@ -1,12 +1,13 @@
 
-#protobuf.js wechat 分支
+# protobuf.js wechat 分支
+
 为微信小程序或小游戏环境提供支持.
-##简介
+## 简介
 基于官方 [protobufjs](https://github.com/protobufjs/protobuf.js) 修改而来.
 修改的原因是微信 runtime 屏蔽了 Function 和 eval 等动态执行代码方式.故改造此类代码 <br/>
 初始fork版本为 [官方 6.11.2](https://github.com/protobufjs/protobuf.js/tree/v6.11.2)
 
-##内容
+## 内容
 
 * 安装<br />
   `npm i --save github:alkaid/protobufjs#v6.11.2-wechat.1`
