@@ -1,6 +1,6 @@
 /*!
- * protobuf.js v6.11.0 (c) 2016, daniel wirtz
- * compiled thu, 29 apr 2021 02:20:44 utc
+ * protobuf.js v6.11.1 (c) 2016, daniel wirtz
+ * compiled sat, 30 oct 2021 06:31:43 utc
  * licensed under the bsd-3-clause license
  * see: https://github.com/dcodeio/protobuf.js for details
  */
@@ -1522,82 +1522,110 @@ var Enum = require(15),
 
 /**
  * Generates a partial value fromObject conveter.
- * @param {Codegen} gen Codegen instance
  * @param {Field} field Reflected field
  * @param {number} fieldIndex Field index
- * @param {string} prop Property reference
+ * @param {string} propName Property reference
  * @returns {Codegen} Codegen instance
  * @ignore
  */
-function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
+function genValuePartial_fromObject(field, fieldIndex, propName,options) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
-    if (field.resolvedType) {
-        if (field.resolvedType instanceof Enum) { gen
-            ("switch(d%s){", prop);
-            for (var values = field.resolvedType.values, keys = Object.keys(values), i = 0; i < keys.length; ++i) {
-                if (field.repeated && values[keys[i]] === field.typeDefault) gen
-                ("default:");
-                gen
-                ("case%j:", keys[i])
-                ("case %i:", values[keys[i]])
-                    ("m%s=%j", prop, values[keys[i]])
-                    ("break");
-            } gen
-            ("}");
-        } else gen
-            ("if(typeof d%s!==\"object\")", prop)
-                ("throw TypeError(%j)", field.fullName + ": object expected")
-            ("m%s=types[%i].fromObject(d%s)", prop, fieldIndex, prop);
+    var m       = options['m'];
+    var d       = options['d'];
+    var _types  = options['types'];
+    var ksi     = options['ksi'];
+    var ksiFlag = typeof ksi != 'undefined';
+    if(field.resolvedType){
+        if(field.resolvedType instanceof Enum){
+            var prop = ksiFlag ? d[propName][ksi] : d[propName];
+            var values = field.resolvedType.values,
+                keys = Object.keys(values);
+            for (var i = 0; i < keys.length; i++){
+                if(field.repeated && values[keys[i]] === field.typeDefault){
+                    continue;
+                }
+                if(keys[i] == prop || values[keys[i]] == prop){
+                    ksiFlag ?
+                        m[propName][ksi] = values[keys[i]] :
+                        m[propName] = values[keys[i]];
+                    break
+                }
+            }
+        }else {
+            if(typeof (ksiFlag ? d[propName][ksi] : d[propName]) !== 'object')
+                throw TypeError(field.fullName + ": object expected");
+            ksiFlag ?
+                m[propName][ksi] = _types[fieldIndex].fromObject(d[propName][ksi]):
+                m[propName] = _types[fieldIndex].fromObject(d[propName]);
+        }
     } else {
-        var isUnsigned = false;
-        switch (field.type) {
+        var  isUnsigned = false;
+        switch (field.type){
             case "double":
-            case "float": gen
-                ("m%s=Number(d%s)", prop, prop); // also catches "NaN", "Infinity"
+            case "float":
+                ksiFlag ?
+                    m[propName][ksi] = Number(d[propName][ksi]) :
+                    m[propName] = Number(d[propName]);
                 break;
             case "uint32":
-            case "fixed32": gen
-                ("m%s=d%s>>>0", prop, prop);
+            case "fixed32":
+                ksiFlag ?
+                    m[propName][ksi] = d[propName][ksi] >>> 0:
+                    m[propName] = d[propName] >>> 0;
                 break;
             case "int32":
             case "sint32":
-            case "sfixed32": gen
-                ("m%s=d%s|0", prop, prop);
+            case "sfixed32":
+                ksiFlag ?
+                    m[propName][ksi] = d[propName][ksi] | 0 :
+                    m[propName] = d[propName] |0;
                 break;
             case "uint64":
                 isUnsigned = true;
-                // eslint-disable-line no-fallthrough
+            // eslint-disable-line no-fallthrough
             case "int64":
             case "sint64":
             case "fixed64":
-            case "sfixed64": gen
-                ("if(util.Long)")
-                    ("(m%s=util.Long.fromValue(d%s)).unsigned=%j", prop, prop, isUnsigned)
-                ("else if(typeof d%s===\"string\")", prop)
-                    ("m%s=parseInt(d%s,10)", prop, prop)
-                ("else if(typeof d%s===\"number\")", prop)
-                    ("m%s=d%s", prop, prop)
-                ("else if(typeof d%s===\"object\")", prop)
-                    ("m%s=new util.LongBits(d%s.low>>>0,d%s.high>>>0).toNumber(%s)", prop, prop, prop, isUnsigned ? "true" : "");
+            case "sfixed64":
+                if(util.Long)
+                    ksiFlag ?
+                        (m[propName][ksi] = util.Long.fromValue(d[propName][ksi])).unsigned = isUnsigned :
+                        (m[propName] = util.Long.fromValue(d[propName])).unsigned = isUnsigned;
+                else if(typeof (ksiFlag ? d[propName][ksi] : d[propName]) === 'string')
+                    ksiFlag ?
+                        m[propName][ksi] =parseInt(d[propName][ksi], 10) :
+                        m[propName] =parseInt(d[propName], 10);
+                else if(typeof (ksiFlag ? d[propName][ksi] : d[propName]) === 'number')
+                    ksiFlag ?
+                        m[propName][ksi] = d[propName][ksi] :
+                        m[propName] = d[propName];
+                else if(typeof (ksiFlag ? d[propName][ksi] : d[propName]) === 'object')
+                    ksiFlag ?
+                        m[propName][ksi] = new util.LongBits(d[propName][ksi].low >>> 0, d[propName][ksi].high >>> 0).toNumber(isUnsigned) :
+                        m[propName] = new util.LongBits(d[propName].low >>> 0, d[propName].high >>> 0).toNumber(isUnsigned);
                 break;
-            case "bytes": gen
-                ("if(typeof d%s===\"string\")", prop)
-                    ("util.base64.decode(d%s,m%s=util.newBuffer(util.base64.length(d%s)),0)", prop, prop, prop)
-                ("else if(d%s.length)", prop)
-                    ("m%s=d%s", prop, prop);
+            case "bytes":
+                if(typeof (ksiFlag ? d[propName][ksi] : d[propName]) ==="string")
+                    ksiFlag ?
+                        util.base64.decode(d[propName][ksi],m[propName][ksi]=util.newBuffer(util.base64.length(d[propName][ksi])),0) :
+                        util.base64.decode(d[propName],m[propName]=util.newBuffer(util.base64.length(d[propName])),0);
+                else if((ksiFlag ? d[propName][ksi] : d[propName]).length)
+                    ksiFlag?
+                        m[propName][ksi]=d[propName][ksi] :
+                        m[propName]=d[propName];
                 break;
-            case "string": gen
-                ("m%s=String(d%s)", prop, prop);
+            case "string":
+                ksiFlag?
+                    m[propName][ksi]=String(d[propName][ksi]) :
+                    m[propName]=String(d[propName]);
                 break;
-            case "bool": gen
-                ("m%s=Boolean(d%s)", prop, prop);
+            case "bool":
+                ksiFlag?
+                    m[propName][ksi]=Boolean(d[propName][ksi]):
+                    m[propName]=Boolean(d[propName]);
                 break;
-            /* default: gen
-                ("m%s=d%s", prop, prop);
-                break; */
         }
     }
-    return gen;
     /* eslint-enable no-unexpected-multiline, block-scoped-var, no-redeclare */
 }
 
@@ -1609,96 +1637,123 @@ function genValuePartial_fromObject(gen, field, fieldIndex, prop) {
 converter.fromObject = function fromObject(mtype) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
     var fields = mtype.fieldsArray;
-    var gen = util.codegen(["d"], mtype.name + "$fromObject")
-    ("if(d instanceof this.ctor)")
-        ("return d");
-    if (!fields.length) return gen
-    ("return new this.ctor");
-    gen
-    ("var m=new this.ctor");
-    for (var i = 0; i < fields.length; ++i) {
-        var field  = fields[i].resolve(),
-            prop   = util.safeProp(field.name);
+    return function (options){
+        return function (d){
+            if(d instanceof this.ctor)
+                return d;
+            if(!fields.length)
+                return new  this.ctor;
 
-        // Map fields
-        if (field.map) { gen
-    ("if(d%s){", prop)
-        ("if(typeof d%s!==\"object\")", prop)
-            ("throw TypeError(%j)", field.fullName + ": object expected")
-        ("m%s={}", prop)
-        ("for(var ks=Object.keys(d%s),i=0;i<ks.length;++i){", prop);
-            genValuePartial_fromObject(gen, field, /* not sorted */ i, prop + "[ks[i]]")
-        ("}")
-    ("}");
-
-        // Repeated fields
-        } else if (field.repeated) { gen
-    ("if(d%s){", prop)
-        ("if(!Array.isArray(d%s))", prop)
-            ("throw TypeError(%j)", field.fullName + ": array expected")
-        ("m%s=[]", prop)
-        ("for(var i=0;i<d%s.length;++i){", prop);
-            genValuePartial_fromObject(gen, field, /* not sorted */ i, prop + "[i]")
-        ("}")
-    ("}");
-
-        // Non-repeated fields
-        } else {
-            if (!(field.resolvedType instanceof Enum)) gen // no need to test for null/undefined if an enum (uses switch)
-    ("if(d%s!=null){", prop); // !== undefined && !== null
-        genValuePartial_fromObject(gen, field, /* not sorted */ i, prop);
-            if (!(field.resolvedType instanceof Enum)) gen
-    ("}");
+            var  m = new this.ctor;
+            for (var i = 0; i < fields.length; ++i){
+                var field       = fields[i].resolve();
+                var propName    = field.name;
+                var _i;
+                if(field.map){
+                    if(d[propName]){
+                        if(typeof d[propName] !== 'object')
+                            throw TypeError(field.fullName + ": object expected");
+                        m[propName] = {};
+                    }
+                    var ks = Object.keys(d[propName]);
+                    for ( _i = 0; _i<ks.length ; ++_i)
+                        genValuePartial_fromObject(field, i, propName, util.merge(util.copy(options), {m:m,d:d,ksi : ks[_i]}));
+                }else if(field.repeated){
+                    if(d[propName]){
+                        if(!Array.isArray(d[propName]))
+                            throw TypeError(field.fullName + ": array expected");
+                        m[propName] = [];
+                        for (_i = 0; _i < d[propName].length; ++_i) {
+                            genValuePartial_fromObject(field, i, propName, util.merge(util.copy(options), {
+                                m: m,
+                                d: d,
+                                ksi: _i
+                            }));
+                        }
+                    }
+                }else {
+                    if((field.resolvedType instanceof Enum) || d[propName]!=null){
+                        genValuePartial_fromObject(field,i,propName, util.merge(util.copy(options), {m:m,d:d}));
+                    }
+                }
+            }
+            return m;
         }
-    } return gen
-    ("return m");
+    }
     /* eslint-enable no-unexpected-multiline, block-scoped-var, no-redeclare */
 };
 
 /**
  * Generates a partial value toObject converter.
- * @param {Codegen} gen Codegen instance
  * @param {Field} field Reflected field
  * @param {number} fieldIndex Field index
- * @param {string} prop Property reference
+ * @param {string} propName Property reference
  * @returns {Codegen} Codegen instance
  * @ignore
  */
-function genValuePartial_toObject(gen, field, fieldIndex, prop) {
+function genValuePartial_toObject(field, fieldIndex, propName,options) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
-    if (field.resolvedType) {
-        if (field.resolvedType instanceof Enum) gen
-            ("d%s=o.enums===String?types[%i].values[m%s]:m%s", prop, fieldIndex, prop, prop);
-        else gen
-            ("d%s=types[%i].toObject(m%s,o)", prop, fieldIndex, prop);
-    } else {
+    var m       = options['m'];
+    var d       = options['d'];
+    var _types  = options['types'];
+    var ksi     = options['ksi'];
+    var o       = options['o'];
+    var ksiFlag = typeof ksi != 'undefined';
+    if(field.resolvedType){
+        if (field.resolvedType instanceof  Enum)
+            ksiFlag ?
+                (d[propName][ksi] = o.enums===String?_types[fieldIndex].values[m[propName][ksi]]:m[propName][ksi]) :
+                (d[propName] = o.enums===String?_types[fieldIndex].values[m[propName]]:m[propName]);
+        else
+            ksiFlag ?
+                d[propName][ksi] = _types[fieldIndex].toObject(m[propName][ksi], o) :
+                d[propName] = _types[fieldIndex].toObject(m[propName], o);
+    }else {
         var isUnsigned = false;
         switch (field.type) {
             case "double":
-            case "float": gen
-            ("d%s=o.json&&!isFinite(m%s)?String(m%s):m%s", prop, prop, prop, prop);
+            case "float":
+                ksiFlag ? (d[propName][ksi] = o.json && !isFinite(m[propName][ksi])? String(m[propName][ksi]):m[propName][ksi]) :
+                    (d[propName] = o.json && !isFinite(m[propName])? String(m[propName]):m[propName]);
                 break;
             case "uint64":
                 isUnsigned = true;
-                // eslint-disable-line no-fallthrough
+            // eslint-disable-line no-fallthrough
             case "int64":
             case "sint64":
             case "fixed64":
-            case "sfixed64": gen
-            ("if(typeof m%s===\"number\")", prop)
-                ("d%s=o.longs===String?String(m%s):m%s", prop, prop, prop)
-            ("else") // Long-like
-                ("d%s=o.longs===String?util.Long.prototype.toString.call(m%s):o.longs===Number?new util.LongBits(m%s.low>>>0,m%s.high>>>0).toNumber(%s):m%s", prop, prop, prop, prop, isUnsigned ? "true": "", prop);
+            case "sfixed64":
+                if(typeof m[propName][ksi] === 'number')
+                    ksiFlag ?
+                        (d[propName][ksi] = o.longs === String ? String(m[propName][ksi]) : m[propName][ksi]) :
+                        (d[propName] = o.longs === String ? String(m[propName]) : m[propName]);
+                else
+                    ksiFlag ?
+                        (d[propName][ksi] =
+                            o.longs === String ?
+                                util.Long.prototype.toString.call(m[propName][ksi]) :
+                                o.longs === Number ? new  util.LongBits(m[propName][ksi].low >>> 0, m[propName][ksi].high >>> 0).toNumber(isUnsigned) : m[propName][ksi]):
+                        (d[propName] =
+                            o.longs === String ?
+                                util.Long.prototype.toString.call(m[propName]) :
+                                o.longs === Number ? new  util.LongBits(m[propName].low >>> 0, m[propName].high >>> 0).toNumber(isUnsigned) : m[propName]);
                 break;
-            case "bytes": gen
-            ("d%s=o.bytes===String?util.base64.encode(m%s,0,m%s.length):o.bytes===Array?Array.prototype.slice.call(m%s):m%s", prop, prop, prop, prop, prop);
+            case "bytes":
+                ksiFlag?
+                    (d[propName][ksi] =
+                        o.bytes === String ?
+                            util.base64.encode(m[propName][ksi], 0, m[propName][ksi].length) :
+                            o.bytes === Array ? Array.prototype.slice.call(m[propName][ksi]) : m[propName][ksi]):
+                    (d[propName] =
+                        o.bytes === String ?
+                            util.base64.encode(m[propName], 0, m[propName].length) :
+                            o.bytes === Array ? Array.prototype.slice.call(m[propName]) : m[propName]);
                 break;
-            default: gen
-            ("d%s=m%s", prop, prop);
+            default:
+                ksiFlag ? d[propName][ksi] = m[propName][ksi] : d[propName] = m[propName];
                 break;
         }
     }
-    return gen;
     /* eslint-enable no-unexpected-multiline, block-scoped-var, no-redeclare */
 }
 
@@ -1710,97 +1765,108 @@ function genValuePartial_toObject(gen, field, fieldIndex, prop) {
 converter.toObject = function toObject(mtype) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
     var fields = mtype.fieldsArray.slice().sort(util.compareFieldsById);
-    if (!fields.length)
-        return util.codegen()("return {}");
-    var gen = util.codegen(["m", "o"], mtype.name + "$toObject")
-    ("if(!o)")
-        ("o={}")
-    ("var d={}");
+    return function (options){
+        if(!fields.length)
+            return function (){
+                return {};
+            };
+        return function (m, o){
+            o = o || {};
+            var d = {};
+            var repeatedFields = [],
+                mapFields = [],
+                normalFields = [],
+                field,
+                propName,
+                i = 0;
+            for (; i < fields.length; ++i)
+                if (!fields[i].partOf)
+                    ( fields[i].resolve().repeated ? repeatedFields
+                        : fields[i].map ? mapFields
+                            : normalFields).push(fields[i]);
 
-    var repeatedFields = [],
-        mapFields = [],
-        normalFields = [],
-        i = 0;
-    for (; i < fields.length; ++i)
-        if (!fields[i].partOf)
-            ( fields[i].resolve().repeated ? repeatedFields
-            : fields[i].map ? mapFields
-            : normalFields).push(fields[i]);
+            if (repeatedFields.length) {
+                if(o.arrays || o.defaults ){
+                    for (i = 0; i < repeatedFields.length; ++i)
+                        d[repeatedFields[i].name] = [];
+                }
+            }
 
-    if (repeatedFields.length) { gen
-    ("if(o.arrays||o.defaults){");
-        for (i = 0; i < repeatedFields.length; ++i) gen
-        ("d%s=[]", util.safeProp(repeatedFields[i].name));
-        gen
-    ("}");
-    }
+            if (mapFields.length) {
+                if(o.objects || o.defaults){
+                    for  (i = 0; i < mapFields.length; ++i)
+                        d[mapFields[i].name] = {};
+                }
+            }
 
-    if (mapFields.length) { gen
-    ("if(o.objects||o.defaults){");
-        for (i = 0; i < mapFields.length; ++i) gen
-        ("d%s={}", util.safeProp(mapFields[i].name));
-        gen
-    ("}");
-    }
+            if(normalFields.length){
+                if(o.defaults){
+                    for (i = 0; i < normalFields.length; ++i){
+                        field       = normalFields[i],
+                            propName    = field.name;
+                        if(field.resolvedType instanceof Enum)
+                            d[propName] = o.enums === String ? field.resolvedType.valuesById[field.typeDefault] : field.typeDefault;
+                        else if(field.long){
+                            if(util.Long){
+                                var n = new util.Long(field.typeDefault.low, field.typeDefault.high, field.typeDefault.unsigned);
+                                d[propName] = o.longs === String ? n.toString() : o.longs === Number ? n.toNumber():n;
+                            }else {
+                                d[propName] = o.longs === String ? field.typeDefault.toString() : field.typeDefault.toNumber();
+                            }
+                        }else if(field.bytes){
+                            var arrayDefault=Array.prototype.slice.call(field.typeDefault);
+                            if(o.bytes === String){
+                                d[propName]=String.fromCharCode.apply(String, field.typeDefault)
+                            }else{
+                                d[propName]=arrayDefault;
+                                if(o.bytes!==Array){
+                                    d[propName]=util.newBuffer(d[propName]);
+                                }
+                            }
+                        }else {
+                            d[propName] =field.typeDefault;
+                        }
 
-    if (normalFields.length) { gen
-    ("if(o.defaults){");
-        for (i = 0; i < normalFields.length; ++i) {
-            var field = normalFields[i],
-                prop  = util.safeProp(field.name);
-            if (field.resolvedType instanceof Enum) gen
-        ("d%s=o.enums===String?%j:%j", prop, field.resolvedType.valuesById[field.typeDefault], field.typeDefault);
-            else if (field.long) gen
-        ("if(util.Long){")
-            ("var n=new util.Long(%i,%i,%j)", field.typeDefault.low, field.typeDefault.high, field.typeDefault.unsigned)
-            ("d%s=o.longs===String?n.toString():o.longs===Number?n.toNumber():n", prop)
-        ("}else")
-            ("d%s=o.longs===String?%j:%i", prop, field.typeDefault.toString(), field.typeDefault.toNumber());
-            else if (field.bytes) {
-                var arrayDefault = "[" + Array.prototype.slice.call(field.typeDefault).join(",") + "]";
-                gen
-        ("if(o.bytes===String)d%s=%j", prop, String.fromCharCode.apply(String, field.typeDefault))
-        ("else{")
-            ("d%s=%s", prop, arrayDefault)
-            ("if(o.bytes!==Array)d%s=util.newBuffer(d%s)", prop, prop)
-        ("}");
-            } else gen
-        ("d%s=%j", prop, field.typeDefault); // also messages (=null)
-        } gen
-    ("}");
-    }
-    var hasKs2 = false;
-    for (i = 0; i < fields.length; ++i) {
-        var field = fields[i],
-            index = mtype._fieldsArray.indexOf(field),
-            prop  = util.safeProp(field.name);
-        if (field.map) {
-            if (!hasKs2) { hasKs2 = true; gen
-    ("var ks2");
-            } gen
-    ("if(m%s&&(ks2=Object.keys(m%s)).length){", prop, prop)
-        ("d%s={}", prop)
-        ("for(var j=0;j<ks2.length;++j){");
-            genValuePartial_toObject(gen, field, /* sorted */ index, prop + "[ks2[j]]")
-        ("}");
-        } else if (field.repeated) { gen
-    ("if(m%s&&m%s.length){", prop, prop)
-        ("d%s=[]", prop)
-        ("for(var j=0;j<m%s.length;++j){", prop);
-            genValuePartial_toObject(gen, field, /* sorted */ index, prop + "[j]")
-        ("}");
-        } else { gen
-    ("if(m%s!=null&&m.hasOwnProperty(%j)){", prop, field.name); // !== undefined && !== null
-        genValuePartial_toObject(gen, field, /* sorted */ index, prop);
-        if (field.partOf) gen
-        ("if(o.oneofs)")
-            ("d%s=%j", util.safeProp(field.partOf.name), field.name);
+                    }
+                }
+            }
+            var hasKs2 = false;
+            for (i = 0; i < fields.length; ++i){
+                field       = fields[i];
+                propName    = field.name;
+                var index   = mtype._fieldsArray.indexOf(field);
+                var ks2;
+                var  j;
+                if(field.map){
+                    if (!hasKs2){
+                        hasKs2 = true;
+                    }
+                    if (m[propName]&&(ks2 = Object.keys(m[propName])).length){
+                        d[propName] = {};
+                        for (j = 0; j < ks2.length; ++j){
+                            genValuePartial_toObject (field, index, propName, util.merge(util.copy(options), {m:m,d:d,ksi :ks2[j],o:o}));
+                        }
+                    }
+                }else if(field.repeated){
+                    if(m[propName]&&m[propName].length){
+                        d[propName] = [];
+                        for (j = 0; j < m[propName].length; ++j){
+                            genValuePartial_toObject(field, index, propName, util.merge(util.copy(options), {m:m,d:d,ksi:j,o:o}))
+                        }
+                    }
+                }else {
+                    if(m[propName]!=null&& (m.hasOwnProperty(propName)/*|| field.partOf*/)){
+                        genValuePartial_toObject(field, index, propName, util.merge(util.copy(options), {m:m,d:d,o:o}))
+                    }
+                    if(field.partOf) {
+                        if (o.oneofs)
+                            d[field.partOf.name] = propName;
+                    }
+                }
+            }
+            return d;
         }
-        gen
-    ("}");
     }
-    return gen
-    ("return d");
     /* eslint-enable no-unexpected-multiline, block-scoped-var, no-redeclare */
 };
 
@@ -1823,114 +1889,116 @@ function missing(field) {
  */
 function decoder(mtype) {
     /* eslint-disable no-unexpected-multiline */
-    var gen = util.codegen(["r", "l"], mtype.name + "$decode")
-    ("if(!(r instanceof Reader))")
-        ("r=Reader.create(r)")
-    ("var c=l===undefined?r.len:r.pos+l,m=new this.ctor" + (mtype.fieldsArray.filter(function(field) { return field.map; }).length ? ",k,value" : ""))
-    ("while(r.pos<c){")
-        ("var t=r.uint32()");
-    if (mtype.group) gen
-        ("if((t&7)===4)")
-            ("break");
-    gen
-        ("switch(t>>>3){");
+    return function (options){
+        var Reader = options.Reader;
+        var _types = options.types;
+        var _util   = options.util;
+        return function (r, l){
+            if(!(r instanceof Reader))
+                r = Reader.create(r);
+            var c = l === undefined ? r.len : r.pos + l,
+                m = new this.ctor;
+            var k,value;
+            while (r.pos < c){
+                var t = r.uint32();
+                if (mtype.group){
+                    if((t&7) === 4)
+                        break;
+                }
+                var fieldId = t>>>3;
+                var i = 0;
+                var find = false;
+                for (; i < mtype.fieldsArray.length; ++i){
+                    var field = mtype._fieldsArray[i].resolve(),
+                        name  = field.name,
+                        type  = field.resolvedType instanceof Enum ? "int32" : field.type;
+                    //ref   = m[field.name];    //下面有赋值,不能直接用ref 还不如用m[name]
+                    if (fieldId != field.id) continue;
+                    find = true;
+                    if (field.map){
+                        // r.skip().pos++;
+                        if(m[name] === _util.emptyObject)
+                            m[name] = {};
+                        var c2=r.uint32()+r.pos;
+                        if(types.defaults[field.keyType]!==undefined)
+                            k=types.defaults[field.keyType];
+                        else
+                            k=null;
+                        if(types.defaults[type]!==undefined)
+                            value=types.defaults[type];
+                        else
+                            value=null;
+                        while (r.pos<c2){
+                            var tag2=r.uint32();
+                            switch (tag2>>>3){
+                                case 1: k=r[field.keyType]();break;
+                                case 2:
+                                    if(types.basic[type] === undefined)
+                                        value=_types[i].decode(r,r.uint32()); // can't be groups
+                                    else
+                                        value=r[type]();
+                                    break;
+                                default:
+                                    r.skipType(tag2&7);
+                                    break;
+                            }
+                        }
+                        if(types.long[field.keyType]!==undefined)
+                            m[name][typeof k ==='object' ? _util.longToHash(k):k]=value;
+                        else
+                            m[name][k]=value;
 
-    var i = 0;
-    for (; i < /* initializes */ mtype.fieldsArray.length; ++i) {
-        var field = mtype._fieldsArray[i].resolve(),
-            type  = field.resolvedType instanceof Enum ? "int32" : field.type,
-            ref   = "m" + util.safeProp(field.name); gen
-            ("case %i:", field.id);
+                    }else if(field.repeated){
+                        if(!(m[name] && m[name].length)){
+                            m[name] = [];
+                        }
 
-        // Map fields
-        if (field.map) { gen
-                ("if(%s===util.emptyObject)", ref)
-                    ("%s={}", ref)
-                ("var c2 = r.uint32()+r.pos");
+                        if(types.packed[type] !== undefined && (t&7) === 2){
+                            var c2 = r.uint32()+ r.pos;
+                            while (r.pos < c2)
+                                m[name].push(r[type]())
+                        }else {
+                            if(types.basic[type] === undefined){
+                                field.resolvedType.group ?
+                                    m[name].push(_types[i].decode(r)) :
+                                    m[name].push(_types[i].decode(r, r.uint32()))
 
-            if (types.defaults[field.keyType] !== undefined) gen
-                ("k=%j", types.defaults[field.keyType]);
-            else gen
-                ("k=null");
+                            }else {
+                                m[name].push(r[type]());
+                            }
+                        }
+                    }else if (types.basic[type] === undefined){
+                        if(field.resolvedType.group){
+                            m[name] = _types[i].decode(r);
+                        }else {
+                            m[name] = _types[i].decode(r, r.uint32());
+                        }
+                    }else {
+                        //console.log("m",JSON.stringify(m),"type",type,"field",field);
+                        m[name] = r[type]();
+                    }
+                    break;
+                }
 
-            if (types.defaults[type] !== undefined) gen
-                ("value=%j", types.defaults[type]);
-            else gen
-                ("value=null");
+                if(!find){
+                    console.log("t",t);
+                    r.skipType(t&7)
+                }
 
-            gen
-                ("while(r.pos<c2){")
-                    ("var tag2=r.uint32()")
-                    ("switch(tag2>>>3){")
-                        ("case 1: k=r.%s(); break", field.keyType)
-                        ("case 2:");
+            }
 
-            if (types.basic[type] === undefined) gen
-                            ("value=types[%i].decode(r,r.uint32())", i); // can't be groups
-            else gen
-                            ("value=r.%s()", type);
-
-            gen
-                            ("break")
-                        ("default:")
-                            ("r.skipType(tag2&7)")
-                            ("break")
-                    ("}")
-                ("}");
-
-            if (types.long[field.keyType] !== undefined) gen
-                ("%s[typeof k===\"object\"?util.longToHash(k):k]=value", ref);
-            else gen
-                ("%s[k]=value", ref);
-
-        // Repeated fields
-        } else if (field.repeated) { gen
-
-                ("if(!(%s&&%s.length))", ref, ref)
-                    ("%s=[]", ref);
-
-            // Packable (always check for forward and backward compatiblity)
-            if (types.packed[type] !== undefined) gen
-                ("if((t&7)===2){")
-                    ("var c2=r.uint32()+r.pos")
-                    ("while(r.pos<c2)")
-                        ("%s.push(r.%s())", ref, type)
-                ("}else");
-
-            // Non-packed
-            if (types.basic[type] === undefined) gen(field.resolvedType.group
-                    ? "%s.push(types[%i].decode(r))"
-                    : "%s.push(types[%i].decode(r,r.uint32()))", ref, i);
-            else gen
-                    ("%s.push(r.%s())", ref, type);
-
-        // Non-repeated
-        } else if (types.basic[type] === undefined) gen(field.resolvedType.group
-                ? "%s=types[%i].decode(r)"
-                : "%s=types[%i].decode(r,r.uint32())", ref, i);
-        else gen
-                ("%s=r.%s()", ref, type);
-        gen
-                ("break");
-    // Unknown fields
-    } gen
-            ("default:")
-                ("r.skipType(t&7)")
-                ("break")
-
-        ("}")
-    ("}");
-
-    // Field presence
-    for (i = 0; i < mtype._fieldsArray.length; ++i) {
-        var rfield = mtype._fieldsArray[i];
-        if (rfield.required) gen
-    ("if(!m.hasOwnProperty(%j))", rfield.name)
-        ("throw util.ProtocolError(%j,{instance:m})", missing(rfield));
+            for (i = 0; i < mtype._fieldsArray.length; ++ i){
+                var rfield = mtype._fieldsArray[i];
+                if(rfield.required){
+                    if(!m.hasOwnProperty(rfield.name)){
+                        throw util.ProtocolError(missing(rfield),{instance:m})
+                    }
+                }
+            }
+            //mtype.fieldsArray.filter(function(field) { return field.map; }).length
+            return m;
+        }
     }
-
-    return gen
-    ("return m");
     /* eslint-enable no-unexpected-multiline */
 }
 
@@ -1964,75 +2032,88 @@ function genTypePartial(gen, field, fieldIndex, ref) {
  */
 function encoder(mtype) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
-    var gen = util.codegen(["m", "w"], mtype.name + "$encode")
-    ("if(!w)")
-        ("w=Writer.create()");
+    return function (options){
+        var Writer = options.Writer;
+        var _types  = options.types;
+        var util   = options.util;
+        return function (message, writer) {
+            writer = writer || Writer.create();
+            var fields = mtype.fieldsArray.slice().sort(util.compareFieldsById);
+            for (var i = 0; i < fields.length; i++) {
+                var field = fields[i];
+                var index = mtype._fieldsArray.indexOf(field);
 
-    var i, ref;
+                var type = field.resolvedType instanceof Enum ? 'uint32' : field.type;
+                var wireType = types.basic[type];
+                var ref      = message[field.name];
+                //此处增加枚举型替换,有可能外界传入的枚举是string,转换成number
+                if(field.resolvedType instanceof Enum && typeof ref === 'string'){
+                    ref = _types[index]['values'][ref];
+                }
 
-    // "when a message is serialized its known fields should be written sequentially by field number"
-    var fields = /* initializes */ mtype.fieldsArray.slice().sort(util.compareFieldsById);
-
-    for (var i = 0; i < fields.length; ++i) {
-        var field    = fields[i].resolve(),
-            index    = mtype._fieldsArray.indexOf(field),
-            type     = field.resolvedType instanceof Enum ? "int32" : field.type,
-            wireType = types.basic[type];
-            ref      = "m" + util.safeProp(field.name);
-
-        // Map fields
-        if (field.map) {
-            gen
-    ("if(%s!=null&&Object.hasOwnProperty.call(m,%j)){", ref, field.name) // !== undefined && !== null
-        ("for(var ks=Object.keys(%s),i=0;i<ks.length;++i){", ref)
-            ("w.uint32(%i).fork().uint32(%i).%s(ks[i])", (field.id << 3 | 2) >>> 0, 8 | types.mapKey[field.keyType], field.keyType);
-            if (wireType === undefined) gen
-            ("types[%i].encode(%s[ks[i]],w.uint32(18).fork()).ldelim().ldelim()", index, ref); // can't be groups
-            else gen
-            (".uint32(%i).%s(%s[ks[i]]).ldelim()", 16 | wireType, type, ref);
-            gen
-        ("}")
-    ("}");
-
-            // Repeated fields
-        } else if (field.repeated) { gen
-    ("if(%s!=null&&%s.length){", ref, ref); // !== undefined && !== null
-
-            // Packed repeated
-            if (field.packed && types.packed[type] !== undefined) { gen
-
-        ("w.uint32(%i).fork()", (field.id << 3 | 2) >>> 0)
-        ("for(var i=0;i<%s.length;++i)", ref)
-            ("w.%s(%s[i])", type, ref)
-        ("w.ldelim()");
-
-            // Non-packed
-            } else { gen
-
-        ("for(var i=0;i<%s.length;++i)", ref);
-                if (wireType === undefined)
-            genTypePartial(gen, field, index, ref + "[i]");
-                else gen
-            ("w.uint32(%i).%s(%s[i])", (field.id << 3 | wireType) >>> 0, type, ref);
-
-            } gen
-    ("}");
-
-        // Non-repeated
-        } else {
-            if (field.optional) gen
-    ("if(%s!=null&&Object.hasOwnProperty.call(m,%j))", ref, field.name); // !== undefined && !== null
-
-            if (wireType === undefined)
-        genTypePartial(gen, field, index, ref);
-            else gen
-        ("w.uint32(%i).%s(%s)", (field.id << 3 | wireType) >>> 0, type, ref);
-
+                //正式进行序列化
+                if (field.map) {//有待验证
+                    if(ref != null && Object.hasOwnProperty.call(message,field.name)){
+                        for (var  ks =Object.keys(ref), l = 0; l < ks.length; ++l){
+                            writer.uint32((field.id << 3 | 2) >>> 0).fork().uint32(8 | types.mapKey[field.keyType])[field.keyType](ks[l]);
+                            if(wireType === undefined ){
+                                _types[index].encode(ref[ks[l]], writer.uint32(18).fork()).ldelim().ldelim();
+                            }else {
+                                writer.uint32(16 | wireType)[type](ref[ks[l]]).ldelim();
+                            }
+                        }
+                    }
+                } else if (field.repeated) {
+                    if (ref && ref.length) {
+                        if (field.packed && types.packed[type] !== undefined) {//如果数据可以被packed的话
+                            writer.uint32((field.id << 3 | 2) >>> 0).fork();
+                            for (var j = 0; j < ref.length; j++) {
+                                writer[type](ref[j])
+                            }
+                            writer.ldelim();
+                        } else {//数据不能packed的话
+                            for (var k = 0; k < ref.length; k++) {
+                                if (wireType === undefined) {//如果是一个自定义的数据类型
+                                    if(field.resolvedType.group){
+                                        _types[index].encode(ref[k],writer.uint32((field.id << 3 | 3) >>> 0)).uint32((field.id << 3 | 4) >>> 0);
+                                    }else {
+                                        _types[index].encode(ref[k],writer.uint32((field.id << 3 | 2) >>> 0).fork()).ldelim();
+                                    }
+                                } else {//如果是string 或者 bytes
+                                    writer.uint32((field.id << 3 | wireType) >>> 0)[type](ref[k]);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if(field.optional){
+                        if(ref != null && Object.hasOwnProperty.call(message,field.name)){
+                            if(wireType===undefined) {
+                                // genTypePartial(gen, field, index, ref);
+                                if (field.resolvedType.group)
+                                    _types[index].encode(ref, writer.uint32((field.id << 3 | 3) >>> 0)).uint32((field.id << 3 | 4) >>> 0);
+                                else
+                                    _types[index].encode(ref, writer.uint32((field.id << 3 | 2) >>> 0).fork()).ldelim();
+                            }else{
+                                writer.uint32((field.id << 3 | wireType) >>> 0)[type](ref);
+                            }
+                        }
+                    }else{
+                        if(wireType===undefined) {
+                            // genTypePartial(gen, field, index, ref);
+                            if (field.resolvedType.group)
+                                _types[index].encode(ref, writer.uint32((field.id << 3 | 3) >>> 0)).uint32((field.id << 3 | 4) >>> 0);
+                            else
+                                _types[index].encode(ref, writer.uint32((field.id << 3 | 2) >>> 0).fork()).ldelim();
+                        }else{
+                            writer.uint32((field.id << 3 | wireType) >>> 0)[type](ref);
+                        }
+                    }
+                }
+            }
+            return writer;
         }
-    }
-
-    return gen
-    ("return w");
+    };
     /* eslint-enable no-unexpected-multiline, block-scoped-var, no-redeclare */
 }
 
@@ -2300,13 +2381,13 @@ function Field(name, id, type, rule, extend, options, comment) {
     if (extend !== undefined && !util.isString(extend))
         throw TypeError("extend must be a string");
 
+    if (rule === "proto3_optional") {
+        rule = "optional";
+    }
     /**
      * Field rule, if any.
      * @type {string|undefined}
      */
-    if (rule === "proto3_optional") {
-        rule = "optional";
-    }
     this.rule = rule && rule !== "optional" ? rule : undefined; // toJSON
 
     /**
@@ -3192,6 +3273,7 @@ var ReflectionObject = require(24);
 ((Namespace.prototype = Object.create(ReflectionObject.prototype)).constructor = Namespace).className = "Namespace";
 
 var Field    = require(16),
+    OneOf    = require(25),
     util     = require(37);
 
 var Type,    // cyclic
@@ -3403,7 +3485,7 @@ Namespace.prototype.getEnum = function getEnum(name) {
  */
 Namespace.prototype.add = function add(object) {
 
-    if (!(object instanceof Field && object.extend !== undefined || object instanceof Type || object instanceof Enum || object instanceof Service || object instanceof Namespace))
+    if (!(object instanceof Field && object.extend !== undefined || object instanceof Type || object instanceof Enum || object instanceof Service || object instanceof Namespace || object instanceof OneOf))
         throw TypeError("object must be a valid nested object");
 
     if (!this.nested)
@@ -3618,7 +3700,7 @@ Namespace._configure = function(Type_, Service_, Enum_) {
     Enum    = Enum_;
 };
 
-},{"16":16,"24":24,"37":37}],24:[function(require,module,exports){
+},{"16":16,"24":24,"25":25,"37":37}],24:[function(require,module,exports){
 "use strict";
 module.exports = ReflectionObject;
 
@@ -6696,16 +6778,25 @@ Object.defineProperties(Type.prototype, {
  */
 Type.generateConstructor = function generateConstructor(mtype) {
     /* eslint-disable no-unexpected-multiline */
-    var gen = util.codegen(["p"], mtype.name);
-    // explicitly initialize mutable object/array fields so that these aren't just inherited from the prototype
-    for (var i = 0, field; i < mtype.fieldsArray.length; ++i)
-        if ((field = mtype._fieldsArray[i]).map) gen
-            ("this%s={}", util.safeProp(field.name));
-        else if (field.repeated) gen
-            ("this%s=[]", util.safeProp(field.name));
-    return gen
-    ("if(p)for(var ks=Object.keys(p),i=0;i<ks.length;++i)if(p[ks[i]]!=null)") // omit undefined or null
-        ("this[ks[i]]=p[ks[i]]");
+    return function (){
+        return function (p){
+            for (var i = 0, field; i < mtype.fieldsArray.length; i++){
+                if((field = mtype._fieldsArray[i]).map){
+                    this[field.name] = {};
+                }else if(field.repeated){
+                    this[field.name] = [];
+                }
+            }
+
+            if(p){
+                for (var  ks = Object.keys(p), j = 0; j < ks.length; ++j) {
+                    if (p[ks[j]] != null) {
+                        this[ks[j]] = p[ks[j]]
+                    }
+                }
+            }
+        };
+    }
     /* eslint-enable no-unexpected-multiline */
 };
 
@@ -7944,7 +8035,16 @@ function merge(dst, src, ifNotSet) { // used by converters
 }
 
 util.merge = merge;
-
+util.copy = function(obj){
+    if(typeof obj != 'object'){
+        return obj;
+    }
+    var  newObj = {};
+    for (var  attr in obj) {
+        newObj[attr] = obj[attr];
+    }
+    return newObj;
+};
 /**
  * Converts the first character of a string to lower case.
  * @param {string} str String to convert
@@ -8135,32 +8235,25 @@ function invalid(field, expected) {
 
 /**
  * Generates a partial value verifier.
- * @param {Codegen} gen Codegen instance
  * @param {Field} field Reflected field
  * @param {number} fieldIndex Field index
  * @param {string} ref Variable reference
  * @returns {Codegen} Codegen instance
  * @ignore
  */
-function genVerifyValue(gen, field, fieldIndex, ref) {
-    /* eslint-disable no-unexpected-multiline */
-    if (field.resolvedType) {
-        if (field.resolvedType instanceof Enum) { gen
-            ("switch(%s){", ref)
-                ("default:")
-                    ("return%j", invalid(field, "enum value"));
-            for (var keys = Object.keys(field.resolvedType.values), j = 0; j < keys.length; ++j) gen
-                ("case %i:", field.resolvedType.values[keys[j]]);
-            gen
-                    ("break")
-            ("}");
-        } else {
-            gen
-            ("{")
-                ("var e=types[%i].verify(%s);", fieldIndex, ref)
-                ("if(e)")
-                    ("return%j+e", field.name + ".")
-            ("}");
+function genVerifyValue(field, fieldIndex, ref, options){
+    var _types = options.types;
+    if(field.resolvedType){
+        if(field.resolvedType instanceof Enum){
+            var keys = Object.keys(field.resolvedType.values);
+            if (keys[ref] === undefined){
+                //没有找到时候
+                return invalid(field, "enum value");
+            }
+        }else {
+            var e = _types[fieldIndex].verify(ref);
+            if(e)
+                return field.name + "."+ e;
         }
     } else {
         switch (field.type) {
@@ -8168,74 +8261,70 @@ function genVerifyValue(gen, field, fieldIndex, ref) {
             case "uint32":
             case "sint32":
             case "fixed32":
-            case "sfixed32": gen
-                ("if(!util.isInteger(%s))", ref)
-                    ("return%j", invalid(field, "integer"));
+            case "sfixed32":
+                if (!util.isInteger(ref))
+                    return invalid(field, "integer");
                 break;
             case "int64":
             case "uint64":
             case "sint64":
             case "fixed64":
-            case "sfixed64": gen
-                ("if(!util.isInteger(%s)&&!(%s&&util.isInteger(%s.low)&&util.isInteger(%s.high)))", ref, ref, ref, ref)
-                    ("return%j", invalid(field, "integer|Long"));
+            case "sfixed64":
+                if(!util.isInteger(ref)&&!(ref&&util.isInteger(ref.low)&&util.isInteger(ref.high)))
+                    return invalid(field, "integer|Long");
                 break;
             case "float":
-            case "double": gen
-                ("if(typeof %s!==\"number\")", ref)
-                    ("return%j", invalid(field, "number"));
+            case "double":
+                if(typeof ref!=="number")
+                    return invalid(field, "number");
                 break;
-            case "bool": gen
-                ("if(typeof %s!==\"boolean\")", ref)
-                    ("return%j", invalid(field, "boolean"));
+            case "bool":
+                if(typeof ref!=="boolean")
+                    return invalid(field, "boolean");
                 break;
-            case "string": gen
-                ("if(!util.isString(%s))", ref)
-                    ("return%j", invalid(field, "string"));
+            case "string":
+                if(!util.isString(ref))
+                    return invalid(field, "string");
                 break;
-            case "bytes": gen
-                ("if(!(%s&&typeof %s.length===\"number\"||util.isString(%s)))", ref, ref, ref)
-                    ("return%j", invalid(field, "buffer"));
+            case "bytes":
+                if(!(ref&&typeof ref.length==="number"||util.isString(ref)))
+                    return invalid(field, "buffer");
                 break;
         }
     }
-    return gen;
     /* eslint-enable no-unexpected-multiline */
 }
 
 /**
  * Generates a partial key verifier.
- * @param {Codegen} gen Codegen instance
  * @param {Field} field Reflected field
  * @param {string} ref Variable reference
  * @returns {Codegen} Codegen instance
  * @ignore
  */
-function genVerifyKey(gen, field, ref) {
-    /* eslint-disable no-unexpected-multiline */
-    switch (field.keyType) {
+function genVerifyKey(field, ref) {
+    switch(field.keyType){
         case "int32":
         case "uint32":
         case "sint32":
         case "fixed32":
-        case "sfixed32": gen
-            ("if(!util.key32Re.test(%s))", ref)
-                ("return%j", invalid(field, "integer key"));
+        case "sfixed32":
+            if(!util.key32Re.test(ref))
+                return invalid(field, "integer key");
             break;
         case "int64":
         case "uint64":
         case "sint64":
         case "fixed64":
-        case "sfixed64": gen
-            ("if(!util.key64Re.test(%s))", ref) // see comment above: x is ok, d is not
-                ("return%j", invalid(field, "integer|Long key"));
+        case "sfixed64":
+            if(!util.key64Re.test(ref))
+                return invalid(field, "integer|Long key");
             break;
-        case "bool": gen
-            ("if(!util.key2Re.test(%s))", ref)
-                ("return%j", invalid(field, "boolean key"));
+        case "bool":
+            if(!util.key2Re.test(ref))
+                return invalid(field, "boolean key");
             break;
     }
-    return gen;
     /* eslint-enable no-unexpected-multiline */
 }
 
@@ -8247,57 +8336,67 @@ function genVerifyKey(gen, field, ref) {
 function verifier(mtype) {
     /* eslint-disable no-unexpected-multiline */
 
-    var gen = util.codegen(["m"], mtype.name + "$verify")
-    ("if(typeof m!==\"object\"||m===null)")
-        ("return%j", "object expected");
-    var oneofs = mtype.oneofsArray,
-        seenFirstField = {};
-    if (oneofs.length) gen
-    ("var p={}");
+    return function (options){
+        return function (m){
+            var invalidDes;
+            if(typeof m !== 'object' || m === null)
+                return "object expected";
 
-    for (var i = 0; i < /* initializes */ mtype.fieldsArray.length; ++i) {
-        var field = mtype._fieldsArray[i].resolve(),
-            ref   = "m" + util.safeProp(field.name);
+            var oneofs = mtype.oneofsArray,
+                seenFirstField = {};
+            var p;
+            if(oneofs.length)
+                p = {};
+            for (var i = 0; i < mtype.fieldsArray.length; ++i){
+                var field = mtype._fieldsArray[i].resolve(),
+                    ref   = m[field.name];
+                if(!field.optional || (ref!=null&& m.hasOwnProperty(field.name))){
+                    var  _i;
+                    if (field.map){
+                        if(!util.isObject(ref))
+                            return invalid(field, "object");
+                        var k=Object.keys(ref);
+                        for (_i = 0; _i < k.length; ++_i){
+                            //检查key值的合法性
+                            invalidDes = genVerifyKey(field, k[_i]);
+                            if(invalidDes){
+                                return invalidDes;
+                            }
+                            //检查value值的合法性
+                            invalidDes = genVerifyValue(field, i, ref[k[_i]], options);
+                            if(invalidDes){
+                                return invalidDes;
+                            }
+                        }
+                    } else if(field.repeated){
+                        if(!Array.isArray(ref)){
+                            return invalid(field, "array");
+                        }
 
-        if (field.optional) gen
-        ("if(%s!=null&&m.hasOwnProperty(%j)){", ref, field.name); // !== undefined && !== null
-
-        // map fields
-        if (field.map) { gen
-            ("if(!util.isObject(%s))", ref)
-                ("return%j", invalid(field, "object"))
-            ("var k=Object.keys(%s)", ref)
-            ("for(var i=0;i<k.length;++i){");
-                genVerifyKey(gen, field, "k[i]");
-                genVerifyValue(gen, field, i, ref + "[k[i]]")
-            ("}");
-
-        // repeated fields
-        } else if (field.repeated) { gen
-            ("if(!Array.isArray(%s))", ref)
-                ("return%j", invalid(field, "array"))
-            ("for(var i=0;i<%s.length;++i){", ref);
-                genVerifyValue(gen, field, i, ref + "[i]")
-            ("}");
-
-        // required or present fields
-        } else {
-            if (field.partOf) {
-                var oneofProp = util.safeProp(field.partOf.name);
-                if (seenFirstField[field.partOf.name] === 1) gen
-            ("if(p%s===1)", oneofProp)
-                ("return%j", field.partOf.name + ": multiple values");
-                seenFirstField[field.partOf.name] = 1;
-                gen
-            ("p%s=1", oneofProp);
+                        for (_i = 0; _i < ref.length; ++_i) {
+                            invalidDes = genVerifyValue(field, i, ref[_i], options);
+                            if(invalidDes){
+                                return invalidDes;
+                            }
+                        }
+                    } else {
+                        if(field.partOf) {
+                            var  oneofPropName = field.partOf.name;
+                            if (seenFirstField[field.partOf.name] === 1)
+                                if(p[oneofPropName] === 1)
+                                    return field.partOf.name + ": multiple values";
+                            p[oneofPropName] = 1
+                        }
+                        invalidDes = genVerifyValue(field, i, ref, options);
+                        if(invalidDes){
+                            return invalidDes;
+                        }
+                    }
+                }
             }
-            genVerifyValue(gen, field, i, ref);
+            return null;
         }
-        if (field.optional) gen
-        ("}");
     }
-    return gen
-    ("return null");
     /* eslint-enable no-unexpected-multiline */
 }
 },{"15":15,"37":37}],41:[function(require,module,exports){

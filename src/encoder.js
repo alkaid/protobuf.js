@@ -27,74 +27,87 @@ function genTypePartial(gen, field, fieldIndex, ref) {
  */
 function encoder(mtype) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
-    var gen = util.codegen(["m", "w"], mtype.name + "$encode")
-    ("if(!w)")
-        ("w=Writer.create()");
+    return function (options){
+        var Writer = options.Writer;
+        var _types  = options.types;
+        var util   = options.util;
+        return function (message, writer) {
+            writer = writer || Writer.create();
+            var fields = mtype.fieldsArray.slice().sort(util.compareFieldsById);
+            for (var i = 0; i < fields.length; i++) {
+                var field = fields[i];
+                var index = mtype._fieldsArray.indexOf(field);
 
-    var i, ref;
+                var type = field.resolvedType instanceof Enum ? 'uint32' : field.type;
+                var wireType = types.basic[type];
+                var ref      = message[field.name];
+                //此处增加枚举型替换,有可能外界传入的枚举是string,转换成number
+                if(field.resolvedType instanceof Enum && typeof ref === 'string'){
+                    ref = _types[index]['values'][ref];
+                }
 
-    // "when a message is serialized its known fields should be written sequentially by field number"
-    var fields = /* initializes */ mtype.fieldsArray.slice().sort(util.compareFieldsById);
-
-    for (var i = 0; i < fields.length; ++i) {
-        var field    = fields[i].resolve(),
-            index    = mtype._fieldsArray.indexOf(field),
-            type     = field.resolvedType instanceof Enum ? "int32" : field.type,
-            wireType = types.basic[type];
-            ref      = "m" + util.safeProp(field.name);
-
-        // Map fields
-        if (field.map) {
-            gen
-    ("if(%s!=null&&Object.hasOwnProperty.call(m,%j)){", ref, field.name) // !== undefined && !== null
-        ("for(var ks=Object.keys(%s),i=0;i<ks.length;++i){", ref)
-            ("w.uint32(%i).fork().uint32(%i).%s(ks[i])", (field.id << 3 | 2) >>> 0, 8 | types.mapKey[field.keyType], field.keyType);
-            if (wireType === undefined) gen
-            ("types[%i].encode(%s[ks[i]],w.uint32(18).fork()).ldelim().ldelim()", index, ref); // can't be groups
-            else gen
-            (".uint32(%i).%s(%s[ks[i]]).ldelim()", 16 | wireType, type, ref);
-            gen
-        ("}")
-    ("}");
-
-            // Repeated fields
-        } else if (field.repeated) { gen
-    ("if(%s!=null&&%s.length){", ref, ref); // !== undefined && !== null
-
-            // Packed repeated
-            if (field.packed && types.packed[type] !== undefined) { gen
-
-        ("w.uint32(%i).fork()", (field.id << 3 | 2) >>> 0)
-        ("for(var i=0;i<%s.length;++i)", ref)
-            ("w.%s(%s[i])", type, ref)
-        ("w.ldelim()");
-
-            // Non-packed
-            } else { gen
-
-        ("for(var i=0;i<%s.length;++i)", ref);
-                if (wireType === undefined)
-            genTypePartial(gen, field, index, ref + "[i]");
-                else gen
-            ("w.uint32(%i).%s(%s[i])", (field.id << 3 | wireType) >>> 0, type, ref);
-
-            } gen
-    ("}");
-
-        // Non-repeated
-        } else {
-            if (field.optional) gen
-    ("if(%s!=null&&Object.hasOwnProperty.call(m,%j))", ref, field.name); // !== undefined && !== null
-
-            if (wireType === undefined)
-        genTypePartial(gen, field, index, ref);
-            else gen
-        ("w.uint32(%i).%s(%s)", (field.id << 3 | wireType) >>> 0, type, ref);
-
+                //正式进行序列化
+                if (field.map) {//有待验证
+                    if(ref != null && Object.hasOwnProperty.call(message,field.name)){
+                        for (var  ks =Object.keys(ref), l = 0; l < ks.length; ++l){
+                            writer.uint32((field.id << 3 | 2) >>> 0).fork().uint32(8 | types.mapKey[field.keyType])[field.keyType](ks[l]);
+                            if(wireType === undefined ){
+                                _types[index].encode(ref[ks[l]], writer.uint32(18).fork()).ldelim().ldelim();
+                            }else {
+                                writer.uint32(16 | wireType)[type](ref[ks[l]]).ldelim();
+                            }
+                        }
+                    }
+                } else if (field.repeated) {
+                    if (ref && ref.length) {
+                        if (field.packed && types.packed[type] !== undefined) {//如果数据可以被packed的话
+                            writer.uint32((field.id << 3 | 2) >>> 0).fork();
+                            for (var j = 0; j < ref.length; j++) {
+                                writer[type](ref[j])
+                            }
+                            writer.ldelim();
+                        } else {//数据不能packed的话
+                            for (var k = 0; k < ref.length; k++) {
+                                if (wireType === undefined) {//如果是一个自定义的数据类型
+                                    if(field.resolvedType.group){
+                                        _types[index].encode(ref[k],writer.uint32((field.id << 3 | 3) >>> 0)).uint32((field.id << 3 | 4) >>> 0);
+                                    }else {
+                                        _types[index].encode(ref[k],writer.uint32((field.id << 3 | 2) >>> 0).fork()).ldelim();
+                                    }
+                                } else {//如果是string 或者 bytes
+                                    writer.uint32((field.id << 3 | wireType) >>> 0)[type](ref[k]);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if(field.optional){
+                        if(ref != null && Object.hasOwnProperty.call(message,field.name)){
+                            if(wireType===undefined) {
+                                // genTypePartial(gen, field, index, ref);
+                                if (field.resolvedType.group)
+                                    _types[index].encode(ref, writer.uint32((field.id << 3 | 3) >>> 0)).uint32((field.id << 3 | 4) >>> 0);
+                                else
+                                    _types[index].encode(ref, writer.uint32((field.id << 3 | 2) >>> 0).fork()).ldelim();
+                            }else{
+                                writer.uint32((field.id << 3 | wireType) >>> 0)[type](ref);
+                            }
+                        }
+                    }else{
+                        if(wireType===undefined) {
+                            // genTypePartial(gen, field, index, ref);
+                            if (field.resolvedType.group)
+                                _types[index].encode(ref, writer.uint32((field.id << 3 | 3) >>> 0)).uint32((field.id << 3 | 4) >>> 0);
+                            else
+                                _types[index].encode(ref, writer.uint32((field.id << 3 | 2) >>> 0).fork()).ldelim();
+                        }else{
+                            writer.uint32((field.id << 3 | wireType) >>> 0)[type](ref);
+                        }
+                    }
+                }
+            }
+            return writer;
         }
-    }
-
-    return gen
-    ("return w");
+    };
     /* eslint-enable no-unexpected-multiline, block-scoped-var, no-redeclare */
 }

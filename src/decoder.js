@@ -16,113 +16,115 @@ function missing(field) {
  */
 function decoder(mtype) {
     /* eslint-disable no-unexpected-multiline */
-    var gen = util.codegen(["r", "l"], mtype.name + "$decode")
-    ("if(!(r instanceof Reader))")
-        ("r=Reader.create(r)")
-    ("var c=l===undefined?r.len:r.pos+l,m=new this.ctor" + (mtype.fieldsArray.filter(function(field) { return field.map; }).length ? ",k,value" : ""))
-    ("while(r.pos<c){")
-        ("var t=r.uint32()");
-    if (mtype.group) gen
-        ("if((t&7)===4)")
-            ("break");
-    gen
-        ("switch(t>>>3){");
+    return function (options){
+        var Reader = options.Reader;
+        var _types = options.types;
+        var _util   = options.util;
+        return function (r, l){
+            if(!(r instanceof Reader))
+                r = Reader.create(r);
+            var c = l === undefined ? r.len : r.pos + l,
+                m = new this.ctor;
+            var k,value;
+            while (r.pos < c){
+                var t = r.uint32();
+                if (mtype.group){
+                    if((t&7) === 4)
+                        break;
+                }
+                var fieldId = t>>>3;
+                var i = 0;
+                var find = false;
+                for (; i < mtype.fieldsArray.length; ++i){
+                    var field = mtype._fieldsArray[i].resolve(),
+                        name  = field.name,
+                        type  = field.resolvedType instanceof Enum ? "int32" : field.type;
+                    //ref   = m[field.name];    //下面有赋值,不能直接用ref 还不如用m[name]
+                    if (fieldId != field.id) continue;
+                    find = true;
+                    if (field.map){
+                        // r.skip().pos++;
+                        if(m[name] === _util.emptyObject)
+                            m[name] = {};
+                        var c2=r.uint32()+r.pos;
+                        if(types.defaults[field.keyType]!==undefined)
+                            k=types.defaults[field.keyType];
+                        else
+                            k=null;
+                        if(types.defaults[type]!==undefined)
+                            value=types.defaults[type];
+                        else
+                            value=null;
+                        while (r.pos<c2){
+                            var tag2=r.uint32();
+                            switch (tag2>>>3){
+                                case 1: k=r[field.keyType]();break;
+                                case 2:
+                                    if(types.basic[type] === undefined)
+                                        value=_types[i].decode(r,r.uint32()); // can't be groups
+                                    else
+                                        value=r[type]();
+                                    break;
+                                default:
+                                    r.skipType(tag2&7);
+                                    break;
+                            }
+                        }
+                        if(types.long[field.keyType]!==undefined)
+                            m[name][typeof k ==='object' ? _util.longToHash(k):k]=value;
+                        else
+                            m[name][k]=value;
 
-    var i = 0;
-    for (; i < /* initializes */ mtype.fieldsArray.length; ++i) {
-        var field = mtype._fieldsArray[i].resolve(),
-            type  = field.resolvedType instanceof Enum ? "int32" : field.type,
-            ref   = "m" + util.safeProp(field.name); gen
-            ("case %i:", field.id);
+                    }else if(field.repeated){
+                        if(!(m[name] && m[name].length)){
+                            m[name] = [];
+                        }
 
-        // Map fields
-        if (field.map) { gen
-                ("if(%s===util.emptyObject)", ref)
-                    ("%s={}", ref)
-                ("var c2 = r.uint32()+r.pos");
+                        if(types.packed[type] !== undefined && (t&7) === 2){
+                            var c2 = r.uint32()+ r.pos;
+                            while (r.pos < c2)
+                                m[name].push(r[type]())
+                        }else {
+                            if(types.basic[type] === undefined){
+                                field.resolvedType.group ?
+                                    m[name].push(_types[i].decode(r)) :
+                                    m[name].push(_types[i].decode(r, r.uint32()))
 
-            if (types.defaults[field.keyType] !== undefined) gen
-                ("k=%j", types.defaults[field.keyType]);
-            else gen
-                ("k=null");
+                            }else {
+                                m[name].push(r[type]());
+                            }
+                        }
+                    }else if (types.basic[type] === undefined){
+                        if(field.resolvedType.group){
+                            m[name] = _types[i].decode(r);
+                        }else {
+                            m[name] = _types[i].decode(r, r.uint32());
+                        }
+                    }else {
+                        //console.log("m",JSON.stringify(m),"type",type,"field",field);
+                        m[name] = r[type]();
+                    }
+                    break;
+                }
 
-            if (types.defaults[type] !== undefined) gen
-                ("value=%j", types.defaults[type]);
-            else gen
-                ("value=null");
+                if(!find){
+                    console.log("t",t);
+                    r.skipType(t&7)
+                }
 
-            gen
-                ("while(r.pos<c2){")
-                    ("var tag2=r.uint32()")
-                    ("switch(tag2>>>3){")
-                        ("case 1: k=r.%s(); break", field.keyType)
-                        ("case 2:");
+            }
 
-            if (types.basic[type] === undefined) gen
-                            ("value=types[%i].decode(r,r.uint32())", i); // can't be groups
-            else gen
-                            ("value=r.%s()", type);
-
-            gen
-                            ("break")
-                        ("default:")
-                            ("r.skipType(tag2&7)")
-                            ("break")
-                    ("}")
-                ("}");
-
-            if (types.long[field.keyType] !== undefined) gen
-                ("%s[typeof k===\"object\"?util.longToHash(k):k]=value", ref);
-            else gen
-                ("%s[k]=value", ref);
-
-        // Repeated fields
-        } else if (field.repeated) { gen
-
-                ("if(!(%s&&%s.length))", ref, ref)
-                    ("%s=[]", ref);
-
-            // Packable (always check for forward and backward compatiblity)
-            if (types.packed[type] !== undefined) gen
-                ("if((t&7)===2){")
-                    ("var c2=r.uint32()+r.pos")
-                    ("while(r.pos<c2)")
-                        ("%s.push(r.%s())", ref, type)
-                ("}else");
-
-            // Non-packed
-            if (types.basic[type] === undefined) gen(field.resolvedType.group
-                    ? "%s.push(types[%i].decode(r))"
-                    : "%s.push(types[%i].decode(r,r.uint32()))", ref, i);
-            else gen
-                    ("%s.push(r.%s())", ref, type);
-
-        // Non-repeated
-        } else if (types.basic[type] === undefined) gen(field.resolvedType.group
-                ? "%s=types[%i].decode(r)"
-                : "%s=types[%i].decode(r,r.uint32())", ref, i);
-        else gen
-                ("%s=r.%s()", ref, type);
-        gen
-                ("break");
-    // Unknown fields
-    } gen
-            ("default:")
-                ("r.skipType(t&7)")
-                ("break")
-
-        ("}")
-    ("}");
-
-    // Field presence
-    for (i = 0; i < mtype._fieldsArray.length; ++i) {
-        var rfield = mtype._fieldsArray[i];
-        if (rfield.required) gen
-    ("if(!m.hasOwnProperty(%j))", rfield.name)
-        ("throw util.ProtocolError(%j,{instance:m})", missing(rfield));
+            for (i = 0; i < mtype._fieldsArray.length; ++ i){
+                var rfield = mtype._fieldsArray[i];
+                if(rfield.required){
+                    if(!m.hasOwnProperty(rfield.name)){
+                        throw util.ProtocolError(missing(rfield),{instance:m})
+                    }
+                }
+            }
+            //mtype.fieldsArray.filter(function(field) { return field.map; }).length
+            return m;
+        }
     }
-
-    return gen
-    ("return m");
     /* eslint-enable no-unexpected-multiline */
 }

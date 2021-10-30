@@ -242,7 +242,16 @@ function merge(dst, src, ifNotSet) { // used by converters
 }
 
 util.merge = merge;
-
+util.copy = function(obj){
+    if(typeof obj != 'object'){
+        return obj;
+    }
+    var  newObj = {};
+    for (var  attr in obj) {
+        newObj[attr] = obj[attr];
+    }
+    return newObj;
+};
 /**
  * Converts the first character of a string to lower case.
  * @param {string} str String to convert

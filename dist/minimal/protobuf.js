@@ -1,6 +1,6 @@
 /*!
- * protobuf.js v6.11.0 (c) 2016, daniel wirtz
- * compiled thu, 29 apr 2021 02:20:44 utc
+ * protobuf.js v6.11.1 (c) 2016, daniel wirtz
+ * compiled sat, 30 oct 2021 06:31:43 utc
  * licensed under the bsd-3-clause license
  * see: https://github.com/dcodeio/protobuf.js for details
  */
@@ -1976,7 +1976,16 @@ function merge(dst, src, ifNotSet) { // used by converters
 }
 
 util.merge = merge;
-
+util.copy = function(obj){
+    if(typeof obj != 'object'){
+        return obj;
+    }
+    var  newObj = {};
+    for (var  attr in obj) {
+        newObj[attr] = obj[attr];
+    }
+    return newObj;
+};
 /**
  * Converts the first character of a string to lower case.
  * @param {string} str String to convert
