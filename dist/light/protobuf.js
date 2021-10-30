@@ -1,6 +1,6 @@
 /*!
  * protobuf.js v6.11.1 (c) 2016, daniel wirtz
- * compiled sat, 30 oct 2021 06:31:43 utc
+ * compiled sat, 30 oct 2021 08:09:02 utc
  * licensed under the bsd-3-clause license
  * see: https://github.com/dcodeio/protobuf.js for details
  */
@@ -6600,14 +6600,14 @@ function invalid(field, expected) {
  * @ignore
  */
 function genVerifyValue(field, fieldIndex, ref, options){
+    /* eslint-disable no-unexpected-multiline */
     var _types = options.types;
     if(field.resolvedType){
         if(field.resolvedType instanceof Enum){
-            var keys = Object.keys(field.resolvedType.values);
-            if (keys[ref] === undefined){
-                //没有找到时候
-                return invalid(field, "enum value");
+            for(var k in field.resolvedType.values){
+                if(field.resolvedType.values[k]===ref) return ;
             }
+            return invalid(field, "enum value");
         }else {
             var e = _types[fieldIndex].verify(ref);
             if(e)
@@ -6661,6 +6661,7 @@ function genVerifyValue(field, fieldIndex, ref, options){
  * @ignore
  */
 function genVerifyKey(field, ref) {
+    /* eslint-disable no-unexpected-multiline */
     switch(field.keyType){
         case "int32":
         case "uint32":
