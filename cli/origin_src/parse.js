@@ -11,6 +11,7 @@ var tokenize  = require("./tokenize"),
     MapField  = require("./mapfield"),
     OneOf     = require("./oneof"),
     Enum      = require("./enum"),
+    EnumValue = require("./enum_value"),
     Service   = require("./service"),
     Method    = require("./method"),
     types     = require("./types"),
@@ -542,8 +543,9 @@ function parse(source, root, options) {
             throw illegal(token, "name");
 
         skip("=");
-        var value = parseId(next(), true),
-            dummy = {};
+        var value = parseId(next(), true)
+            // dummy = {};
+        var dummy=new EnumValue(token,value)
         ifBlock(dummy, function parseEnumValue_block(token) {
 
             /* istanbul ignore else */
@@ -557,6 +559,7 @@ function parse(source, root, options) {
             parseInlineOptions(dummy); // skip
         });
         parent.add(token, value, dummy.comment);
+        parent.add_(dummy);
     }
 
     function parseOption(parent, token) {

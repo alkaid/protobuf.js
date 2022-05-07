@@ -124,7 +124,9 @@ exports.main = function main(args, callback) {
                 "",
                 chalk.bold.gray("  Proto sources only:"),
                 "",
-                "  --keep-case      Keeps field casing instead of converting to camel case.",
+                "  --keep-case                  Keeps field casing instead of converting to camel case.",
+                "  --alternateCommentMode       Recognize double-slash comments in addition to doc-block comments.",
+                "  --preferTrailingComment      Use trailing comment when both leading comment and trailing comment exist.",
                 "",
                 chalk.bold.gray("  Static targets only:"),
                 "",
@@ -202,7 +204,9 @@ exports.main = function main(args, callback) {
     }
 
     var parseOptions = {
-        "keepCase": argv["keep-case"] || false
+        "keepCase": argv["keep-case"] || false,
+        "alternateCommentMode": argv["alternateCommentMode"] || false,
+        "preferTrailingComment": argv["preferTrailingComment"] || false,
     };
 
     // Read from stdin

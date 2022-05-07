@@ -708,4 +708,111 @@ function buildEnum(ref, enm) {
         push("return values;");
     --indent;
     push("})();");
+
+    // 添加带options的Enum额外数据
+    if (config.forceEnumString) return;
+    var hasOptions=false;
+    Object.keys(enm.values_).forEach(function(key) {
+        var val =  enm.values_[key];
+        if (val.options){
+            hasOptions=true;
+        }
+    });
+    if(!hasOptions) return;
+    push("");
+
+    // 废弃,这种map的方式不知道怎么生成声明文件
+    // var comment = [
+    //     enm.comment || enm.name + "_ enum.",
+    //     enm.parent instanceof protobuf.Root ? "@exports " + escapeName(enm.name+"_") : "@name " + exportName(enm)+"_",
+    //     config.forceEnumString ? "@enum {string}" : "@enum {number}",
+    // ];
+    // Object.keys(enm.values_).forEach(function(key) {
+    //     var val = config.forceEnumString ? key : enm.values_[key];
+    //     comment.push((config.forceEnumString ? "@property {string} " : "@property {number} ") + key + "=" + val + " " + (enm.comments[key] || key + " value"));
+    // });
+    // pushComment(comment);
+    // if (!ref && config.es6)
+    //     push("export const " + escapeName(enm.name) + "_ = " + escapeName(ref) + "." + escapeName(enm.name+"_") + " = (() => {");
+    // else
+    //     push(escapeName(ref) + "." + escapeName(enm.name) + "_ = (function() {");
+    // ++indent;
+    // push((config.es6 ? "const" : "var") + " valuesById = {}, values = Object.create(valuesById);");
+    // var aliased = [];
+    // Object.keys(enm.values_).forEach(function(key) {
+    //     var valObj = enm.values_[key];
+    //     var valueId = enm.values[key];
+    //     var optionsStr=""
+    //     if(valObj.options){
+    //         optionsStr="options:{"
+    //         Object.keys(valObj.options).forEach(function(optKey) {
+    //             if(typeof valObj.options[optKey] === "number"){
+    //                 optionsStr+=`"${optKey}":${valObj.options[optKey]},`
+    //             }else{
+    //                 optionsStr+=`"${optKey}":"${valObj.options[optKey]}",`
+    //             }
+    //         });
+    //         optionsStr+="},"
+    //     }
+    //     push(`var enumValue={value:${valueId},${optionsStr}};`);
+    //     if (aliased.indexOf(valueId) > -1) {
+    //         push("values[" + JSON.stringify(key) + "] = enumValue;");
+    //     }else {
+    //         push("valuesById[" + valueId + "] =  enumValue;");
+    //         push("values[" + JSON.stringify(key) + "] =  enumValue;");
+    //         aliased.push(valueId);
+    //     }
+    // });
+    // push("return values;");
+    // --indent;
+    // push("})();");
+
+    //生成namespace
+    var comment = [
+        enm.comment || enm.name + "_ enum.",
+        enm.parent instanceof protobuf.Root ? "@exports " + escapeName(enm.name+"_") : "@name " + exportName(enm)+"_",
+        "@memberof " +  exportName(enm.parent),
+        "@namespace" ,
+    ];
+    pushComment(comment);
+    if (!ref && config.es6)
+        push("export const " + escapeName(enm.name) + "_ = " + escapeName(ref) + "." + escapeName(enm.name+"_") + " = {");
+    else
+        push(escapeName(ref) + "." + escapeName(enm.name) + "_ =  {");
+    ++indent;
+    Object.keys(enm.values_).forEach(function(key) {
+        var valObj = enm.values_[key];
+        var valueId = enm.values[key];
+        var evcomment=[
+            valObj.comment,
+            "@namespace" ,
+        ];
+        pushComment(evcomment);
+        push(key+":{");
+        ++indent;
+        pushComment(["原枚举值",`@constant {${valueId}}`]);
+        push(`value:${valueId},`);
+        var fullName=valObj.fullName
+        if(fullName.indexOf(".")===0){
+            fullName=fullName.slice(1)
+        }
+        pushComment(["带路径全名",`@constant {"${fullName}"}`]);
+        push(`fullName:"${fullName}",`)
+        if(valObj.options){
+            Object.keys(valObj.options).forEach(function(optKey) {
+                var escapeKey=optKey.replace("(","").replace(")","").replace(".","_")
+                if(typeof valObj.options[optKey] === "number"){
+                    pushComment(["option:"+optKey,`@constant {${valObj.options[optKey]}}`]);
+                    push(`${escapeKey}:${valObj.options[optKey]},`)
+                }else{
+                    pushComment(["option:"+optKey,`@constant {"${valObj.options[optKey]}"}`]);
+                    push(`${escapeKey}:"${valObj.options[optKey]}",`)
+                }
+            });
+        }
+        --indent;
+        push("},");
+    });
+    --indent;
+    push("};");
 }

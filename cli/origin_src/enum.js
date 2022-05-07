@@ -9,6 +9,16 @@ var Namespace = require("./namespace"),
     util = require("./util");
 
 /**
+ * EnumValue parsed from {@link ./enum_value.js}.
+ * @interface IEnumValue
+ * @extends ReflectionObject
+ * @property {string|number} value
+ * @property {string} name
+ * @property {string} fullName
+ * @property {Object.<string,*>|undefined} options
+ */
+
+/**
  * Constructs a new enum instance.
  * @classdesc Reflected enum.
  * @extends ReflectionObject
@@ -16,10 +26,11 @@ var Namespace = require("./namespace"),
  * @param {string} name Unique name within its namespace
  * @param {Object.<string,number>} [values] Enum values as an object, by name
  * @param {Object.<string,*>} [options] Declared options
+ * @param {Object.<string,IEnumValue>} [values_] Enum values as an object, by name
  * @param {string} [comment] The comment for this enum
  * @param {Object.<string,string>} [comments] The value comments for this enum
  */
-function Enum(name, values, options, comment, comments) {
+function Enum(name, values, options, values_, comment, comments) {
     ReflectionObject.call(this, name, options);
 
     if (values && typeof values !== "object")
@@ -36,6 +47,17 @@ function Enum(name, values, options, comment, comments) {
      * @type {Object.<string,number>}
      */
     this.values = Object.create(this.valuesById); // toJSON, marker
+    /**
+     * Enum values by id.
+     * @type {Object.<number,IEnumValue>}
+     */
+    this.valuesById_ = {};
+
+    /**
+     * Enum values by name.
+     * @type {Object.<string,IEnumValue>}
+     */
+    this.values_ = Object.create(this.valuesById_); // toJSON, marker
 
     /**
      * Enum comment text.
@@ -63,6 +85,10 @@ function Enum(name, values, options, comment, comments) {
         for (var keys = Object.keys(values), i = 0; i < keys.length; ++i)
             if (typeof values[keys[i]] === "number") // use forward entries only
                 this.valuesById[ this.values[keys[i]] = values[keys[i]] ] = keys[i];
+    if (values_)
+        for (var keys = Object.keys(values_), i = 0; i < keys.length; ++i)
+            if (typeof values_[keys[i]] === "object") // use forward entries only
+                this.valuesById_[ this.values_[keys[i]] = values_[keys[i]] ] = keys[i];
 }
 
 /**
@@ -70,6 +96,7 @@ function Enum(name, values, options, comment, comments) {
  * @interface IEnum
  * @property {Object.<string,number>} values Enum values
  * @property {Object.<string,*>} [options] Enum options
+ * @property {Object.<string,IEnumValue>} [values_] Enum values as an object, by name
  */
 
 /**
@@ -80,7 +107,7 @@ function Enum(name, values, options, comment, comments) {
  * @throws {TypeError} If arguments are invalid
  */
 Enum.fromJSON = function fromJSON(name, json) {
-    var enm = new Enum(name, json.values, json.options, json.comment, json.comments);
+    var enm = new Enum(name, json.values, json.options,json.values_, json.comment, json.comments);
     enm.reserved = json.reserved;
     return enm;
 };
@@ -95,6 +122,7 @@ Enum.prototype.toJSON = function toJSON(toJSONOptions) {
     return util.toObject([
         "options"  , this.options,
         "values"   , this.values,
+        "values_"   , this.values_,
         "reserved" , this.reserved && this.reserved.length ? this.reserved : undefined,
         "comment"  , keepComments ? this.comment : undefined,
         "comments" , keepComments ? this.comments : undefined
@@ -136,6 +164,24 @@ Enum.prototype.add = function add(name, id, comment) {
         this.valuesById[this.values[name] = id] = name;
 
     this.comments[name] = comment || null;
+    return this;
+};
+
+/**
+ * Adds a value to this enum.
+ * @param {IEnumValue} object Nested object to add
+ * @returns {Enum} `this`
+ * @throws {TypeError} If arguments are invalid
+ * @throws {Error} If there is already a value with this name or id
+ */
+Enum.prototype.add_ = function add_(object) {
+    if (object.parent)
+        object.parent.remove(object);
+    this.values_[object.name]=object;
+    this.valuesById_[object.value]=object;
+    object.enum = this;
+    object.onAdd(this);
+    // return clearCache(this);
     return this;
 };
 
