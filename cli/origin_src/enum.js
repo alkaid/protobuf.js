@@ -120,9 +120,9 @@ Enum.fromJSON = function fromJSON(name, json) {
 Enum.prototype.toJSON = function toJSON(toJSONOptions) {
     var keepComments = toJSONOptions ? Boolean(toJSONOptions.keepComments) : false;
     return util.toObject([
-        "options"  , this.options,
+        // "options"  , this.options,  // 暂时不需要options了,以后需要打开这里就好
         "values"   , this.values,
-        "values_"   , this.values_,
+        // "values_"   , this.values_,  // 暂时不需要options了,以后需要打开这里就好
         "reserved" , this.reserved && this.reserved.length ? this.reserved : undefined,
         "comment"  , keepComments ? this.comment : undefined,
         "comments" , keepComments ? this.comments : undefined
